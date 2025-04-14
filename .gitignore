@@ -1,2 +1,3 @@
 mlruns/*
 eda_plots/*
+.venv/
