@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "mlflow-iris-example"
+version = "0.1.0"
+description = ""
+authors = ["VLTSankalpa <wltsankalpa@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.10.14"
+mlflow = "^2.21.3"
+scikit-learn = "^1.6.1"
+pandas = "^2.2.3"
+matplotlib = "^3.10.1"
+seaborn = "^0.13.2"
+azure-storage-blob = "^12.25.1"
+azure-identity = "^1.21.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
