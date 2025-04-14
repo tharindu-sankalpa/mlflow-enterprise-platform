@@ -8,56 +8,58 @@ python --version # Verify, should show the version you set
 
 poetry init
 
-poetry add mlflow scikit-learn pandas matplotlib seaborn
+poetry add mlflow scikit-learn pandas matplotlib seaborn azure-storage-blob azure-identity
 
 poetry shell
 
 python train.py
 
-mlflow ui
+# mlflow local tracking server is not needed if as we use AKS mlflow server
 
-mlflow models serve -m "runs:/<YOUR_RUN_ID>/iris-logistic-regression-model" -p 1234 --env-manager local
+# mlflow ui
 
-
-curl -X POST -H "Content-Type:application/json" --data '{
-  "dataframe_split": {
-    "columns": [
-      "sepal length (cm)",
-      "sepal width (cm)",
-      "petal length (cm)",
-      "petal width (cm)"
-    ],
-    "data": [
-      [5.1, 3.5, 1.4, 0.2],
-      [6.7, 3.1, 4.7, 1.5],
-      [7.0, 3.2, 4.7, 1.4]
-    ]
-  }
-}' http://127.0.0.1:1234/invocations
+# mlflow models serve -m "runs:/<YOUR_RUN_ID>/iris-logistic-regression-model" -p 1234 --env-manager local
 
 
-
-mlflow models build-docker -m "runs:/<YOUR_RUN_ID>/iris-logistic-regression-model" -n iris-classifier-service
-
-
-docker run -p 1235:8080 iris-classifier-service
+# curl -X POST -H "Content-Type:application/json" --data '{
+#   "dataframe_split": {
+#     "columns": [
+#       "sepal length (cm)",
+#       "sepal width (cm)",
+#       "petal length (cm)",
+#       "petal width (cm)"
+#     ],
+#     "data": [
+#       [5.1, 3.5, 1.4, 0.2],
+#       [6.7, 3.1, 4.7, 1.5],
+#       [7.0, 3.2, 4.7, 1.4]
+#     ]
+#   }
+# }' http://127.0.0.1:1234/invocations
 
 
 
-curl -X POST -H "Content-Type:application/json" --data '{
-  "dataframe_split": {
-    "columns": [
-      "sepal length (cm)", "sepal width (cm)", "petal length (cm)", "petal width (cm)"
-    ],
-    "data": [
-      [5.1, 3.5, 1.4, 0.2], [6.7, 3.1, 4.7, 1.5]
-    ]
-  }
-}' http://127.0.0.1:1235/invocations
+# mlflow models build-docker -m "runs:/<YOUR_RUN_ID>/iris-logistic-regression-model" -n iris-classifier-service
+
+
+# docker run -p 1235:8080 iris-classifier-service
 
 
 
-docker stop <container_id_or_name>
+# curl -X POST -H "Content-Type:application/json" --data '{
+#   "dataframe_split": {
+#     "columns": [
+#       "sepal length (cm)", "sepal width (cm)", "petal length (cm)", "petal width (cm)"
+#     ],
+#     "data": [
+#       [5.1, 3.5, 1.4, 0.2], [6.7, 3.1, 4.7, 1.5]
+#     ]
+#   }
+# }' http://127.0.0.1:1235/invocations
 
 
-docker rm <container_id_or_name>
+
+# docker stop <container_id_or_name>
+
+
+# docker rm <container_id_or_name>
