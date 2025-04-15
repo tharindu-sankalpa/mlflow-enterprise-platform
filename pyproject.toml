@@ -19,6 +19,9 @@ xgboost = "^3.0.0"
 tensorflow = "^2.19.0"
 psutil = "^7.0.0"
 hyperopt = "^0.2.7"
+shap = "^0.47.1"
+ucimlrepo = "^0.0.7"
+scikit-optimize = "^0.10.2"
 
 
 [tool.poetry.group.dev.dependencies]
