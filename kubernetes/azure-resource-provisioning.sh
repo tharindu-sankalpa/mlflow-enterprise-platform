@@ -73,3 +73,8 @@ export MLFLOW_TRACKING_PASSWORD="S3cr3+"
 # helm upgrade mlflow community-charts/mlflow
 # helm upgrade mlflow community-charts/mlflow --namespace $K8S_NAMESPACE -f mlflow-values.yaml
 
+mlflow server \
+    --backend-store-uri file:///home/tharindu/git/mlflow_iris_example/mlflow/mlruns \
+    --default-artifact-root file:///home/tharindu/git/mlflow_iris_example/mlflow/mlruns \
+    --host 0.0.0.0 \
+    --port 5000
