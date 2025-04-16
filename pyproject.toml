@@ -16,12 +16,12 @@ azure-storage-blob = "^12.25.1"
 azure-identity = "^1.21.0"
 dotenv = "^0.9.9"
 xgboost = "^3.0.0"
-tensorflow = "^2.19.0"
 psutil = "^7.0.0"
 hyperopt = "^0.2.7"
 shap = "^0.47.1"
 ucimlrepo = "^0.0.7"
 scikit-optimize = "^0.10.2"
+tensorflow = "2.18.0"
 
 
 [tool.poetry.group.dev.dependencies]
