@@ -3,3 +3,5 @@ eda_plots/*
 .venv/
 notebook/.env
 notebook/eda_outputs/*
+notebook/plots/*
+notebook/metadata/*
