@@ -5,3 +5,4 @@ notebook/.env
 notebook/eda_outputs/*
 notebook/plots/*
 notebook/metadata/*
+notebook/train_test_data.pkl
