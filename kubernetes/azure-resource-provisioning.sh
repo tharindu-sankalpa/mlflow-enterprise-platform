@@ -77,4 +77,5 @@ mlflow server \
     --backend-store-uri file:///home/tharindu/git/mlflow_iris_example/mlflow/mlruns \
     --default-artifact-root file:///home/tharindu/git/mlflow_iris_example/mlflow/mlruns \
     --host 0.0.0.0 \
-    --port 5000
+    --port 5000 \
+    --workers 2
