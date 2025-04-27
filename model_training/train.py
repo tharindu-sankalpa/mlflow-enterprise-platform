@@ -228,8 +228,8 @@ def train_tensorflow_model(X_train, X_test, y_train, y_test, output_dir):
         y_train_pred = (y_train_prob >= 0.5).astype(int)
         y_test_pred = (y_test_prob >= 0.5).astype(int)
         
-        # Save model
-        model_path = os.path.join(output_dir, 'tensorflow_model')
+        # Save model - modified to include .keras extension
+        model_path = os.path.join(output_dir, 'tensorflow_model.keras')
         model.save(model_path)
         print(f"Saved TensorFlow model to {model_path}")
         
