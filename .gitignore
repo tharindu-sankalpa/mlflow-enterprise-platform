@@ -7,3 +7,6 @@ notebook/plots/*
 notebook/metadata/*
 notebook/train_test_data.pkl
 mlflow/*
+outputs/*
+*DS_Store*
+*__pycache__*
