@@ -8,6 +8,28 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
+from sklearn.base import BaseEstimator, TransformerMixin
+
+
+class IntToFloatTransformer(BaseEstimator, TransformerMixin):
+    """
+    Transformer to convert integer columns to float64 to handle missing values properly.
+    This prevents MLflow schema enforcement errors during inference.
+    
+    MLflow's schema inference detects integer columns, but integers cannot represent
+    missing values in Python/NumPy. Converting integers to float64 ensures that:
+    1. Missing values can be properly represented as NaN
+    2. The schema used during inference will match the actual data types
+    3. No schema enforcement errors will occur if missing values appear
+    """
+    def fit(self, X, y=None):
+        return self
+        
+    def transform(self, X):
+        X_copy = X.copy()
+        for col in X_copy.select_dtypes(include=['int64']).columns:
+            X_copy[col] = X_copy[col].astype('float64')
+        return X_copy
 
 
 class AdultDataProcessor:
@@ -85,8 +107,9 @@ class AdultDataProcessor:
         
         This method builds a comprehensive data preprocessing pipeline that:
         1. Handles missing values in both numerical and categorical features
-        2. Standardizes numerical features
-        3. One-hot encodes categorical features
+        2. Converts integer columns to float64 to handle missing values properly
+        3. Standardizes numerical features
+        4. One-hot encodes categorical features
         
         The pipeline uses scikit-learn's ColumnTransformer to apply different
         transformations to numerical and categorical columns.
@@ -125,8 +148,9 @@ class AdultDataProcessor:
             ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
         ])
         
-        # Create preprocessing for numerical features
+        # Create preprocessing for numerical features with int-to-float conversion
         numerical_transformer = Pipeline(steps=[
+            ('int_to_float', IntToFloatTransformer()),  # Convert integers to float64
             ('imputer', SimpleImputer(strategy='median')),
             ('scaler', StandardScaler())
         ])
@@ -173,6 +197,7 @@ class AdultDataProcessor:
         # Extract features (all columns except target)
         X = self.df.drop(columns=[self.target_column])
         
+        # No need for manual conversion - the pipeline will handle it
         return X, y
     
     def train_test_split(self, test_size=0.2, random_state=42):
