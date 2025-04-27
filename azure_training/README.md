@@ -11,6 +11,7 @@ azure_training/
 ├── model_trainer.py        # Model training and evaluation utilities
 ├── train.py                # Main training script
 ├── submit_job.py           # Azure ML job submission script
+├── inference_example.py    # Example script for inference
 ├── requirements.txt        # Python dependencies
 └── conda_dependencies.yml  # Conda environment for Azure ML
 ```
@@ -19,22 +20,24 @@ azure_training/
 
 ### 1. Data Processing (`data_processor.py`)
 
-The `AdultDataProcessor` class handles loading, preprocessing, and splitting the Adult Income dataset.
+The `AdultDataProcessor` class handles loading, preprocessing, and splitting the Adult Income dataset. It uses scikit-learn's `Pipeline` and `ColumnTransformer` for reproducible preprocessing.
 
 Key methods:
 - `load_from_uci()`: Fetches data directly from the UCI repository
 - `load_from_csv(file_path)`: Loads data from a local CSV file
-- `preprocess_data()`: Applies preprocessing steps (handling missing values, one-hot encoding)
+- `create_preprocessing_pipeline()`: Creates a sklearn pipeline for data preprocessing
+- `preprocess_data()`: Applies preprocessing steps to the data
 - `train_test_split(test_size, random_state)`: Splits data into training and test sets
-- `scale_features(X_train, X_test, columns)`: Scales numerical features using StandardScaler
+- `fit_transform_train_data(X_train, y_train)`: Fits preprocessing pipeline on training data
+- `transform_test_data(X_test)`: Transforms test data using fitted pipeline
 - `save_metadata(output_dir)`: Saves dataset metadata to file
 
 ### 2. Model Training (`model_trainer.py`)
 
-The `ModelTrainer` class handles model training, evaluation, and MLflow tracking.
+The `ModelTrainer` class handles model training, evaluation, and MLflow tracking. It can combine preprocessing and model into a single pipeline.
 
 Key methods:
-- `train_and_log(X_train, X_test, y_train, y_test)`: Trains model and logs metrics to MLflow
+- `train_and_log(X_train, X_test, y_train, y_test, use_pipeline)`: Trains model with preprocessing pipeline
 - `_log_metrics(y_true, y_pred, y_prob, prefix)`: Logs classification metrics (accuracy, precision, etc.)
 - `_log_confusion_matrix(cm, title, artifact_name)`: Generates and logs confusion matrix plots
 - `_log_classification_report(y_true, y_pred, prefix)`: Logs detailed classification reports
@@ -52,6 +55,10 @@ The main script that orchestrates the training process. Supports various classif
 ### 4. Azure ML Job Submission (`submit_job.py`)
 
 Utility script to submit training jobs to Azure ML.
+
+### 5. Inference Example (`inference_example.py`)
+
+Demonstrates how to use the trained pipeline for predictions on new data. The pipeline includes all preprocessing steps.
 
 ## Installation
 
@@ -94,6 +101,9 @@ python azure_training/train.py --models all --run_tensorflow
 
 # Use a specific MLflow tracking server
 python azure_training/train.py --mlflow_tracking_uri http://localhost:5000
+
+# full example
+Python azure_training/train.py --models all --run_tensorflow --mlflow_experiment "Adult_Classification_Local" --mlflow_tracking_uri http://127.0.0.1:5000
 ```
 
 ## Running on Azure ML
@@ -147,6 +157,63 @@ python azure_training/submit_job.py \
 - `--run_tensorflow`: Flag to run TensorFlow model
 - `--environment_name`: Environment name (default: "adult-classification-env")
 
+## Inference
+
+The trained models include all preprocessing steps as part of a scikit-learn pipeline, making inference straightforward. You can use the saved pipeline directly with raw data.
+
+### Using a trained model for inference:
+
+```bash
+# Load model from local file
+python azure_training/inference_example.py --model_path ./outputs/LogisticRegression_C_1_0_pipeline.joblib
+
+# Or load from MLflow model registry
+python azure_training/inference_example.py --mlflow_model LogisticRegression_C_1_0 --model_stage Production
+```
+
+You can also use the model in your FastAPI service:
+
+```python
+import joblib
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+# Load the pipeline once at startup
+model_pipeline = joblib.load("./outputs/model_pipeline.joblib")
+
+app = FastAPI()
+
+class AdultData(BaseModel):
+    age: int
+    workclass: str
+    fnlwgt: int
+    education: str
+    education_num: int
+    marital_status: str
+    occupation: str
+    relationship: str
+    race: str
+    sex: str
+    capital_gain: int
+    capital_loss: int
+    hours_per_week: int
+    native_country: str
+
+@app.post("/predict/")
+async def predict(data: AdultData):
+    # Convert to DataFrame
+    input_df = pd.DataFrame([data.dict()])
+    
+    # Predict - preprocessing happens automatically
+    prediction = model_pipeline.predict(input_df)
+    probability = model_pipeline.predict_proba(input_df)[0][1]
+    
+    return {
+        "income_class": "<=50K" if prediction[0] == 0 else ">50K",
+        "probability": float(probability)
+    }
+```
+
 ## MLflow Integration
 
 This project uses MLflow to track experiments. For each model training run, the following information is logged:
@@ -155,7 +222,7 @@ This project uses MLflow to track experiments. For each model training run, the 
 - Evaluation metrics (accuracy, precision, recall, F1, etc.)
 - Confusion matrices
 - Classification reports
-- The model itself for easy deployment
+- The complete pipeline (preprocessing + model) for easy deployment
 
 To view the tracked information, start the MLflow UI:
 
