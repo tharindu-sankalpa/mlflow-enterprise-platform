@@ -85,6 +85,10 @@ class AdultDataProcessor:
         
         # Keep track of the target column name
         self.target_column = self.y.columns[0]
+
+        # To prvent MLflow schema enforcement errors, convert integer columns to float64
+        # int_columns = self.df.select_dtypes(include='int64').columns
+        # self.df[int_columns] = self.df[int_columns].astype('float64')
         
         return self.df
     
