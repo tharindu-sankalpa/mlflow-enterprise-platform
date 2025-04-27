@@ -58,6 +58,11 @@ class AdultDataProcessor:
         
         # One-Hot Encode categorical features
         self.df_encoded = pd.get_dummies(self.df, drop_first=True)
+
+        # Convert all integer columns to float64 to safely handle missing values
+        int_cols = self.df_encoded.select_dtypes(include=['int64']).columns
+        if len(int_cols) > 0:
+            self.df_encoded[int_cols] = self.df_encoded[int_cols].astype('float64')
         
         # The target column gets converted to "income_>50K" in one-hot encoding
         self.target_column = next(col for col in self.df_encoded.columns if col.startswith('income_'))
@@ -71,7 +76,13 @@ class AdultDataProcessor:
         
         X = self.df_encoded.drop(columns=[self.target_column])
         y = self.df_encoded[self.target_column]
+
+        # Double-check integer columns are converted to float64 before splitting
+        int_cols = X.select_dtypes(include=['int64']).columns
+        if len(int_cols) > 0:
+            X[int_cols] = X[int_cols].astype('float64')
         
+        # Split the data
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)
         
         return X_train, X_test, y_train, y_test
