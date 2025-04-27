@@ -59,14 +59,29 @@ def main():
         print("Loading data from UCI repository")
         processor.load_from_uci()
     
-    # Process and split data
-    processor.preprocess_data()
+    # Create preprocessing pipeline
+    print("🔄 Creating preprocessing pipeline...")
+    column_info = processor.create_preprocessing_pipeline()
+    
+    # Get raw train/test split
     X_train, X_test, y_train, y_test = processor.train_test_split()
     
-    # Save processed data
+    # Fit preprocessing pipeline on training data and transform both train and test
+    print("🔄 Fitting preprocessing pipeline...")
+    X_train_transformed, y_train = processor.fit_transform_train_data(X_train, y_train)
+    X_test_transformed = processor.transform_test_data(X_test)
+    
+    # Save processed data and preprocessing pipeline
     data_output_path = os.path.join(args.output_dir, 'train_test_data.pkl')
-    joblib.dump((X_train, X_test, y_train, y_test), data_output_path)
-    print(f"✅ Data processed and saved to {data_output_path}")
+    joblib.dump((X_train_transformed, X_test_transformed, y_train, y_test), data_output_path)
+    
+    pipeline_output_path = os.path.join(args.output_dir, 'preprocessing_pipeline.pkl')
+    joblib.dump(processor.preprocessing_pipeline, pipeline_output_path)
+    
+    # Save column information
+    processor.save_metadata(args.output_dir)
+    
+    print(f"✅ Data processed and saved to {args.output_dir}")
     
     # Parse models to train
     models_to_train = args.models.lower().split(',')
@@ -117,16 +132,20 @@ def main():
             model=model,
             model_name=model_name,
             experiment_name=args.mlflow_experiment,
-            output_dir=args.output_dir
+            output_dir=args.output_dir,
+            preprocessing_pipeline=processor.preprocessing_pipeline
         )
-        trainer.train_and_log(X_train, X_test, y_train, y_test)
+        # Train with the full pipeline (includes preprocessing)
+        trainer.train_and_log(X_train, X_test, y_train, y_test, use_pipeline=True)
     
     # Train TensorFlow DNN model if requested
     if args.run_tensorflow:
         print("🧠 Training TensorFlow DNN model")
-        train_tensorflow_model(X_train, X_test, y_train, y_test, args.output_dir)
+        # For TensorFlow, use the already transformed data
+        train_tensorflow_model(X_train_transformed, X_test_transformed, y_train, y_test, args.output_dir)
     
     print("✅ Training completed successfully!")
+    print(f"📊 Preprocessing pipeline saved to {pipeline_output_path}")
 
 def train_tensorflow_model(X_train, X_test, y_train, y_test, output_dir):
     """Train a TensorFlow DNN model similar to the one in the notebook"""
