@@ -12,10 +12,9 @@ poetry add mlflow scikit-learn pandas matplotlib seaborn azure-storage-blob azur
 
 poetry shell
 
-python train.py
-
 # mlflow local tracking server is not needed if as we use AKS mlflow server
 
+# cd Downloads
 # mlflow ui
 
 # mlflow models serve -m "runs:/<YOUR_RUN_ID>/iris-logistic-regression-model" -p 1234 --env-manager local
