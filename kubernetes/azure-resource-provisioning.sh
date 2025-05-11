@@ -7,14 +7,9 @@ export STORAGE_ACCOUNT_NAME="tharindumlflow$(openssl rand -hex 4)" # Needs to be
 export CONTAINER_NAME="artifactroot"
 export K8S_NAMESPACE="mlflow"
 
-
-helm repo add community-charts https://community-charts.github.io/helm-charts
-helm repo update
-
 az login --use-device-code
 
 az group create --name $RESOURCE_GROUP --location $LOCATION
-
 
 az provider register --namespace Microsoft.ContainerService
 az provider show --namespace Microsoft.ContainerService --query "registrationState"
@@ -26,7 +21,6 @@ az aks create \
   --enable-managed-identity \
   --generate-ssh-keys \
   --location $LOCATION
-
 
 az aks get-credentials --resource-group $RESOURCE_GROUP --name $AKS_CLUSTER_NAME --overwrite-existing
 
@@ -46,11 +40,13 @@ az storage container create \
 export AZURE_STORAGE_ACCESS_KEY=$(az storage account keys list --resource-group $RESOURCE_GROUP --account-name $STORAGE_ACCOUNT_NAME --query "[0].value" -o tsv)
 
 
-sed -i.bak \
-    -e "s|<CONTAINER_NAME>|$CONTAINER_NAME|g" \
-    -e "s|<STORAGE_ACCOUNT_NAME>|$STORAGE_ACCOUNT_NAME|g" \
-    -e "s|<YOUR_AZURE_STORAGE_ACCESS_KEY>|$AZURE_STORAGE_ACCESS_KEY|g" \
-    mlflow-values.yaml
+helm repo add community-charts https://community-charts.github.io/helm-charts
+helm repo update
+
+
+echo "Your Container Name: $CONTAINER_NAME"
+echo "Your Storage Account Name: $STORAGE_ACCOUNT_NAME"
+echo "Your Azure Storage Access Key: $AZURE_STORAGE_ACCESS_KEY"
 
 
 helm install mlflow community-charts/mlflow \
@@ -59,14 +55,14 @@ helm install mlflow community-charts/mlflow \
   -f mlflow-values.yaml
 
 
-kubectl get pods --namespace mlflow
-kubectl get svc --namespace mlflow
-kubectl get pvc --namespace mlflow
-kubectl get secret --namespace mlflow
-
+kubectl get pods -n $K8S_NAMESPACE
+kubectl get svc -n $K8S_NAMESPACE
+kubectl get pvc  -n $K8S_NAMESPACE
+kubectl get secret  -n $K8S_NAMESPACE
+kubectl describe deployment mlflow -n $K8S_NAMESPACE
 
 export MLFLOW_TRACKING_USERNAME="admin"
-export MLFLOW_TRACKING_PASSWORD="S3cr3+"
+export MLFLOW_TRACKING_PASSWORD="<YOUR_MLFLOW_UI_ADMIN_PASSWORD>"
 
 # helm upgrade mlflow community-charts/mlflow
 # helm upgrade mlflow community-charts/mlflow --namespace $K8S_NAMESPACE -f mlflow-values.yaml
