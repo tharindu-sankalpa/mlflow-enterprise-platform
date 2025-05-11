@@ -1,31 +1,39 @@
+# mlflow-values.yaml
+
 # --- PostgreSQL Sub-chart Configuration ---
-# Enable the DEPLOYMENT of PostgreSQL via the sub-chart
+# By default, the MLflow chart might use a simple SQLite backend, which is not suitable for
+# concurrent access or production workloads. We enable the deployment of a PostgreSQL
+# database instance within our Kubernetes cluster via a sub-chart.
+# This database will store MLflow experiment metadata (parameters, metrics, run info).
 postgresql:
-  enabled: true
+  enabled: true  # Set to true to deploy PostgreSQL using the Bitnami PostgreSQL sub-chart.
   auth:
-    # Credentials FOR the PostgreSQL database instance itself
-    database: "mlflow_db"                 # <<< Database to create/use
-    username: "mlflow_user"                   # <<< User for the database
-    password: "mlflow_user@123" # <<< Password for the database user & CHANGE THIS!
+    # These are credentials FOR the PostgreSQL database instance itself.
+    # MLflow server will use these to connect to the database.
+    database: "mlflow_db"                 # Name of the database to be created/used within PostgreSQL.
+    username: "mlflow_user"               # Username for MLflow to access the database.
+    password: "<YOUR_POSTGRESQL_PASSWORD>" # <<< REPLACE THIS with a strong, unique password.
 
 # --- Artifact Store Configuration ---
-# Configure Azure Blob Storage artifact root using the nested structure
+# This section configures MLflow to use Azure Blob Storage as its artifact root.
+# All artifacts (models, plots, data files) will be stored here.
 artifactRoot:
   azureBlob:
-    enabled: true
-    # Fill in your actual Azure Storage details
-    container: "artifactroot"             # <<< REPLACE with your container name
-    storageAccount: "tharindumlflow3be9ca4d"      # <<< REPLACE with your storage account name
-    accessKey: "ugLrB5BkrquADCgGdV+uFy7kQHSrc758EUvB7jpwUQ0fwmkQA5sjs4yI5Z7cGgo21Ld3oUCCoOyo+ASt+pbz6Q=="  # <<< REPLACE with your storage access key
-    # path: "" # Optional: if you want artifacts in a subfolder within the container
+    enabled: true # Explicitly enable Azure Blob storage for artifacts.
+    container: "<YOUR_AZURE_CONTAINER_NAME>"             # <<< REPLACE THIS placeholder
+    storageAccount: "<YOUR_AZURE_STORAGE_ACCOUNT_NAME>"  # <<< REPLACE THIS placeholder
+    accessKey: "<YOUR_AZURE_STORAGE_ACCESS_KEY>"      # <<< REPLACE THIS placeholder
+    # path: "" # Optional: If you want artifacts stored in a specific subfolder within the container.
 
 # --- Service Configuration ---
+# This defines how the MLflow service is exposed within and outside the Kubernetes cluster.
 service:
-  type: LoadBalancer
-  port: 80 # Port the LoadBalancer listens on
+  type: LoadBalancer # Exposes the MLflow UI service externally using a cloud provider's load balancer.
+  port: 80           # The port the LoadBalancer will listen on.
 
-
+# --- MLflow UI Authentication ---
+# This enables basic authentication for accessing the MLflow UI.
 auth:
-  enabled: true
+  enabled: true # Set to true to protect your MLflow UI with a username and password.
   adminUsername: "admin"
-  adminPassword: "S3cr3+"
+  adminPassword: "<YOUR_MLFLOW_UI_ADMIN_PASSWORD>" # <<< REPLACE THIS with a strong, unique password (longer than 12 chars).
