@@ -11,24 +11,32 @@ graph TD
     subgraph "Azure Cloud"
         subgraph "Azure Kubernetes Service"
             subgraph "MLflow Namespace"
-                A[MLflow Server] --> B[(PostgreSQL DB)]
-                A -->|Stores artifacts| C[Azure Blob Storage]
+                A[MLflow Server] --> B[(PostgreSQL DB<br>Metadata Store)]
+                A -->|Stores artifacts| C[Azure Blob Storage<br>Models & Artifacts]
                 D[LoadBalancer Service] --> A
             end
         end
-        E[External User] -->|Accesses MLflow UI via LoadBalancer| D
-        F[ML Engineers] -->|Register models/Track experiments| D
+        
+        E[Data Scientists] -->|Track experiments<br>Access UI| D
+        F[ML Engineers] -->|Register models<br>Deploy models| D
+        
+        subgraph "Development Environments"
+            G[Local Notebooks] -.->|Connect via<br>tracking URI| D
+            H[Cloud Notebooks] -.->|Connect via<br>tracking URI| D
+        end
     end
 
     classDef azure fill:#0072C6,stroke:#0072C6,color:white;
     classDef k8s fill:#326CE5,stroke:#326CE5,color:white;
     classDef db fill:#FFA500,stroke:#FFA500,color:white;
     classDef user fill:#6CB33F,stroke:#6CB33F,color:white;
+    classDef env fill:#9370DB,stroke:#9370DB,color:white;
 
     class C azure;
     class A,B,D k8s;
     class B db;
     class E,F user;
+    class G,H env;
 ```
 
 ## Components
@@ -80,15 +88,42 @@ The MLflow UI is exposed through a LoadBalancer service with the following crede
 
 ## Environment Variables for MLflow Client
 
+Configure these environment variables to connect to the MLflow tracking server from any environment:
+
 ```bash
 export MLFLOW_TRACKING_USERNAME="admin"
 export MLFLOW_TRACKING_PASSWORD="<YOUR_MLFLOW_UI_ADMIN_PASSWORD>"
 export MLFLOW_TRACKING_URI="http://<EXTERNAL-IP>"
 ```
 
+## Using MLflow in Your Code
+
+Connect to the centralized tracking server from any environment:
+
+```python
+import mlflow
+
+# Set the tracking URI to point to the centralized MLflow server
+mlflow.set_tracking_uri("http://<EXTERNAL-IP>")
+
+# Start an experiment run
+with mlflow.start_run():
+    # Log parameters
+    mlflow.log_param("param1", value1)
+    
+    # Log metrics
+    mlflow.log_metric("accuracy", accuracy)
+    
+    # Log artifacts (plots, datasets, etc.)
+    mlflow.log_artifact("path/to/plot.png")
+    
+    # Log models
+    mlflow.sklearn.log_model(model, "model")
+```
+
 ## Local Development Server
 
-For local development, you can run MLflow server on your local machine:
+For local development and testing, you can run MLflow server on your local machine:
 
 ```bash
 mlflow server \
@@ -98,3 +133,11 @@ mlflow server \
     --port 5000 \
     --workers 2
 ```
+
+## Benefits of Centralized MLflow Server
+
+1. **Collaboration**: Teams can easily share experiments and models
+2. **Reproducibility**: Track all parameters, metrics, and dependencies for each experiment
+3. **Governance**: Maintain a central registry of models and their versions
+4. **Deployment**: Streamline the path from experimentation to production
+5. **Comparison**: Easily compare performance across multiple experiments and models
