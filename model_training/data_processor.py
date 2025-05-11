@@ -4,11 +4,26 @@ import os
 import json
 from ucimlrepo import fetch_ucirepo
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, PowerTransformer
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.base import BaseEstimator, TransformerMixin
+
+
+# Define operation functions for feature combinations
+# These need to be at the module level to be picklable
+def ratio_operation(x, y):
+    """Compute ratio with protection against division by zero"""
+    return x / (y + 0.1)
+
+def subtract_operation(x, y):
+    """Compute difference between two features"""
+    return x - y
+
+def multiply_operation(x, y):
+    """Compute product of two features"""
+    return x * y
 
 
 class IntToFloatTransformer(BaseEstimator, TransformerMixin):
@@ -30,6 +45,133 @@ class IntToFloatTransformer(BaseEstimator, TransformerMixin):
         for col in X_copy.select_dtypes(include=['int64']).columns:
             X_copy[col] = X_copy[col].astype('float64')
         return X_copy
+
+
+class ZeroAwareLogTransformer(BaseEstimator, TransformerMixin):
+    """
+    Apply logarithmic transformation to columns with special handling for zeros.
+    
+    This transformer applies log(x + 1) to non-zero values and keeps zeros as zeros.
+    This is useful for financial features like capital-gain and capital-loss where:
+    1. Most values are zeros (no gain/loss)
+    2. Non-zero values have high skew and wide range
+    3. The distinction between zero and non-zero is meaningful
+    
+    Parameters:
+        columns (list): List of column names to transform (only used with DataFrame input)
+    """
+    def __init__(self, columns=None):
+        self.columns = columns
+        
+    def fit(self, X, y=None):
+        return self
+        
+    def transform(self, X):
+        # Check if X is a DataFrame or a numpy array
+        if hasattr(X, 'columns'):
+            # DataFrame case
+            X_copy = X.copy()
+            columns_to_transform = self.columns or X_copy.columns
+            
+            for col in columns_to_transform:
+                if col in X_copy.columns:
+                    # Create mask for non-zero values
+                    non_zero_mask = X_copy[col] > 0
+                    
+                    # Apply log transformation only to non-zero values
+                    if non_zero_mask.any():
+                        X_copy.loc[non_zero_mask, col] = np.log1p(X_copy.loc[non_zero_mask, col])
+            
+            return X_copy
+        else:
+            # NumPy array case
+            X_copy = X.copy()
+            
+            # Create mask for non-zero values
+            non_zero_mask = X_copy > 0
+            
+            # Apply log transformation only to non-zero values
+            if np.any(non_zero_mask):
+                X_copy[non_zero_mask] = np.log1p(X_copy[non_zero_mask])
+                
+            return X_copy
+    
+    def get_feature_names_out(self, input_features=None):
+        return self.columns or input_features
+
+
+class ColumnSelector(BaseEstimator, TransformerMixin):
+    """
+    Select specific columns from a DataFrame.
+    
+    This transformer selects specific columns from a DataFrame, which is useful for
+    applying different transformations to different subsets of numerical features.
+    
+    Parameters:
+        columns (list): List of column names to select
+    """
+    def __init__(self, columns):
+        self.columns = columns
+        
+    def fit(self, X, y=None):
+        return self
+        
+    def transform(self, X):
+        X_subset = X[self.columns].copy()
+        return X_subset
+    
+    def get_feature_names_out(self, input_features=None):
+        return self.columns
+
+
+class FeatureCombiner(BaseEstimator, TransformerMixin):
+    """
+    Create new features by combining existing ones with specified operations.
+    
+    This transformer creates new interaction features between variables which might
+    reveal additional patterns in the data. It supports various operations such as
+    ratios, products, and differences between numeric features.
+    
+    Parameters:
+        combinations (list of dicts): Each dict contains:
+            - name: Name of the new feature
+            - columns: List of columns to combine
+            - operation: Function to apply (must be a picklable function)
+    """
+    def __init__(self, combinations):
+        self.combinations = combinations
+        
+    def fit(self, X, y=None):
+        return self
+        
+    def transform(self, X):
+        X_copy = X.copy()
+        result_df = pd.DataFrame(index=X_copy.index)
+        
+        for combo in self.combinations:
+            cols = combo['columns']
+            name = combo['name']
+            operation = combo['operation']
+            
+            # Skip if any column is missing
+            if not all(col in X_copy.columns for col in cols):
+                continue
+                
+            # Apply the operation
+            if len(cols) == 2:
+                # Binary operation (most common case)
+                result_df[name] = operation(X_copy[cols[0]], X_copy[cols[1]])
+            else:
+                # For operations with more than 2 columns
+                result = X_copy[cols[0]].copy()
+                for col in cols[1:]:
+                    result = operation(result, X_copy[col])
+                result_df[name] = result
+                
+        return result_df
+    
+    def get_feature_names_out(self, input_features=None):
+        return [combo['name'] for combo in self.combinations]
 
 
 class AdultDataProcessor:
@@ -112,11 +254,16 @@ class AdultDataProcessor:
         This method builds a comprehensive data preprocessing pipeline that:
         1. Handles missing values in both numerical and categorical features
         2. Converts integer columns to float64 to handle missing values properly
-        3. Standardizes numerical features
-        4. One-hot encodes categorical features
+        3. Applies appropriate transformations to correct data distributions:
+           - Log transform for highly skewed features (fnlwgt)
+           - Zero-aware log transform for financial features (capital-gain, capital-loss)
+           - Power transform for moderately skewed features (age)
+        4. Standardizes numerical features
+        5. One-hot encodes categorical features
+        6. Creates interaction features to capture relationships between variables
         
         The pipeline uses scikit-learn's ColumnTransformer to apply different
-        transformations to numerical and categorical columns.
+        transformations to different column groups.
         
         Returns:
             dict: Dictionary containing column information:
@@ -152,18 +299,88 @@ class AdultDataProcessor:
             ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
         ])
         
-        # Create preprocessing for numerical features with int-to-float conversion
-        numerical_transformer = Pipeline(steps=[
+        # Group numerical features by appropriate transformation type
+        log_columns = ['fnlwgt']
+        zero_aware_log_columns = ['capital-gain', 'capital-loss']
+        power_columns = ['age']
+        regular_columns = [col for col in self.numerical_columns 
+                          if col not in log_columns + zero_aware_log_columns + power_columns]
+        
+        # Create specific transformers for different numerical column groups
+        log_transformer = Pipeline(steps=[
+            ('selector', ColumnSelector(log_columns)),
+            ('imputer', SimpleImputer(strategy='median')),
+            ('log', ZeroAwareLogTransformer()),  # Apply log transform to all selected columns
+            ('scaler', StandardScaler())
+        ])
+        
+        zero_aware_transformer = Pipeline(steps=[
+            ('selector', ColumnSelector(zero_aware_log_columns)),
+            ('imputer', SimpleImputer(strategy='constant', fill_value=0)),
+            ('zero_log', ZeroAwareLogTransformer()),  # Special handling for zeros
+            ('scaler', StandardScaler())
+        ])
+        
+        power_transformer = Pipeline(steps=[
+            ('selector', ColumnSelector(power_columns)),
+            ('imputer', SimpleImputer(strategy='median')),
+            ('power', PowerTransformer(method='yeo-johnson')),  # Yeo-Johnson works with negative values
+            ('scaler', StandardScaler())
+        ])
+        
+        regular_transformer = Pipeline(steps=[
+            ('selector', ColumnSelector(regular_columns)),
             ('int_to_float', IntToFloatTransformer()),  # Convert integers to float64
             ('imputer', SimpleImputer(strategy='median')),
             ('scaler', StandardScaler())
         ])
         
-        # Combine preprocessing for categorical and numerical features
+        # Define feature combinations for interaction features
+        # These are engineered features that combine multiple variables
+        feature_combinations = [
+            # Age-Education ratio - income tends to increase with both age and education
+            {'name': 'age_education_ratio', 
+             'columns': ['age', 'education-num'], 
+             'operation': ratio_operation},  # Use named function instead of lambda
+            
+            # Age-Hours ratio - captures work-life balance which may correlate with income
+            {'name': 'age_hours_ratio', 
+             'columns': ['age', 'hours-per-week'], 
+             'operation': ratio_operation},  # Use named function instead of lambda
+            
+            # Capital difference - net capital movement may be more informative than separate values
+            {'name': 'capital_diff', 
+             'columns': ['capital-gain', 'capital-loss'], 
+             'operation': subtract_operation},  # Use named function instead of lambda
+             
+            # Hours-Education product - highly educated people working many hours likely earn more
+            {'name': 'hours_education_product', 
+             'columns': ['hours-per-week', 'education-num'], 
+             'operation': multiply_operation}  # Use named function instead of lambda
+        ]
+        
+        # Feature combiner transformer
+        feature_combiner = FeatureCombiner(combinations=feature_combinations)
+        
+        # Preprocessing for combined features
+        interaction_transformer = Pipeline(steps=[
+            ('combiner', feature_combiner),
+            ('imputer', SimpleImputer(strategy='median')),
+            ('scaler', StandardScaler())
+        ])
+        
+        # Main preprocessing columns
+        main_columns = log_columns + zero_aware_log_columns + power_columns + regular_columns
+        
+        # Combine all transformers
         self.preprocessing_pipeline = ColumnTransformer(
             transformers=[
-                ('num', numerical_transformer, self.numerical_columns),
-                ('cat', categorical_transformer, self.categorical_columns)
+                ('log', log_transformer, log_columns),
+                ('zero_aware', zero_aware_transformer, zero_aware_log_columns),
+                ('power', power_transformer, power_columns),
+                ('regular', regular_transformer, regular_columns),
+                ('cat', categorical_transformer, self.categorical_columns),
+                ('interactions', interaction_transformer, main_columns)
             ],
             remainder='drop'  # Drop any other columns
         )
