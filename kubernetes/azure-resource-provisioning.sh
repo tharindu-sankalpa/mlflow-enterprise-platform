@@ -40,9 +40,7 @@ az storage account create \
 
 az storage container create \
   --name $CONTAINER_NAME \
-  --account-name $STORAGE_ACCOUNT_NAME \
-  --auth-mode login # Assumes your logged-in az user has rights, or use --account-key
-
+  --account-name $STORAGE_ACCOUNT_NAME
 
 
 export AZURE_STORAGE_ACCESS_KEY=$(az storage account keys list --resource-group $RESOURCE_GROUP --account-name $STORAGE_ACCOUNT_NAME --query "[0].value" -o tsv)
