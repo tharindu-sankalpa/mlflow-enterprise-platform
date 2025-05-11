@@ -1,0 +1,6 @@
+{
+    "sonarlint.connectedMode.project": {
+        "connectionId": "tharindu-mlops",
+        "projectKey": "tharindu-mlops_tf-iris-classifier-gitops-ml-service"
+    }
+}
