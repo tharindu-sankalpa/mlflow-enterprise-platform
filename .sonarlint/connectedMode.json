@@ -1,0 +1,5 @@
+{
+    "sonarCloudOrganization": "tharindu-mlops",
+    "projectKey": "tharindu-mlops_tf-iris-classifier-gitops-ml-service",
+    "region": "EU"
+}
