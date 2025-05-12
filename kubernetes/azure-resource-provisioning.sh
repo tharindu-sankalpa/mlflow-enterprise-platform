@@ -24,7 +24,6 @@ az aks create \
 
 az aks get-credentials --resource-group $RESOURCE_GROUP --name $AKS_CLUSTER_NAME --overwrite-existing
 
-
 az storage account create \
   --name $STORAGE_ACCOUNT_NAME \
   --resource-group $RESOURCE_GROUP \

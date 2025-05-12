@@ -10,3 +10,5 @@ mlflow/*
 outputs/*
 *DS_Store*
 *__pycache__*
+notebook/mlruns/*
+notebook/temp_data_ingestion_artifacts/*

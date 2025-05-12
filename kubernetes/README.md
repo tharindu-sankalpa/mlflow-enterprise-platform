@@ -8,14 +8,16 @@ The architecture consists of the following components:
 
 ```mermaid
 graph TD
-    subgraph "Azure Cloud"
+    subgraph "MLflow Deployment"
         subgraph "Azure Kubernetes Service"
             subgraph "MLflow Namespace"
                 A[MLflow Server] --> B[(PostgreSQL DB<br>Metadata Store)]
-                A -->|Stores artifacts| C[Azure Blob Storage<br>Models & Artifacts]
+                B <--> PVC1[PVC: data-mlflow-postgresql-0]
                 D[LoadBalancer Service] --> A
             end
         end
+        
+        C[Azure Blob Storage<br>artifactroot container] -.->|External Storage<br>for Artifacts| A
         
         E[Data Scientists] -->|Track experiments<br>Access UI| D
         F[ML Engineers] -->|Register models<br>Deploy models| D
@@ -29,11 +31,13 @@ graph TD
     classDef azure fill:#0072C6,stroke:#0072C6,color:white;
     classDef k8s fill:#326CE5,stroke:#326CE5,color:white;
     classDef db fill:#FFA500,stroke:#FFA500,color:white;
+    classDef pvc fill:#32a852,stroke:#32a852,color:white;
     classDef user fill:#6CB33F,stroke:#6CB33F,color:white;
     classDef env fill:#9370DB,stroke:#9370DB,color:white;
 
     class C azure;
     class A,B,D k8s;
+    class PVC1 pvc;
     class B db;
     class E,F user;
     class G,H env;
@@ -49,22 +53,41 @@ graph TD
    - Deployed as a Kubernetes deployment
    - Image: burakince/mlflow:2.22.0
    - Protected with basic authentication
+   - Acts as a centralized tracking server for all ML workflows
+   - Provides experiment tracking, model registry, and model deployment capabilities
 
 3. **PostgreSQL Database**
    - Deployed as a StatefulSet within the Kubernetes cluster
    - Provides persistent backend storage for MLflow metadata
-   - Stores experiment details, parameters, metrics, etc.
+   - Stores experiment details, parameters, metrics, tags, run info
+   - Enables efficient querying and comparison of experiments
+   - Uses Persistent Volume Claim (PVC) for persistent storage
 
-4. **Azure Blob Storage**
+4. **Persistent Volume Claims (PVC)**
+   - PVC Name: data-mlflow-postgresql-0
+   - Size: 8Gi
+   - Access Mode: ReadWriteOnce (RWO)
+   - Storage Class: default
+   - Provides persistent storage for the PostgreSQL database
+
+5. **Azure Blob Storage (External to AKS)**
    - Storage account: tharindumlflow0aa3981a
    - Container: artifactroot
    - Stores MLflow artifacts (models, plots, datasets)
+   - Provides scalable, durable storage for large artifacts
+   - Connected to MLflow via wasbs:// protocol
 
-5. **Kubernetes Resources**
+6. **Kubernetes Resources**
    - Namespace: mlflow
-   - Services: LoadBalancer to expose MLflow UI
-   - Persistent Volume Claims: For PostgreSQL storage
-   - Secrets: For database credentials, auth configuration
+   - Services: LoadBalancer to expose MLflow UI (External IP: 135.235.251.124)
+   - Secrets: For database credentials, auth configuration, flask server, etc.
+
+7. **Client Access**
+   - ML practitioners can connect from various environments:
+     - Local development (VSCode, PyCharm)
+     - Cloud notebooks (Azure ML, Databricks)
+     - CI/CD pipelines
+   - Centralized tracking regardless of where experiments run
 
 ## Setup Instructions
 
