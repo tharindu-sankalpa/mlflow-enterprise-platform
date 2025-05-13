@@ -1,0 +1,17 @@
+{
+  "models": [
+    {
+      "name": "LogisticRegression_Grid",
+      "class": "LogisticRegression",
+      "init_params": {
+        "max_iter": 2000,
+        "random_state": 42
+      },
+      "param_grid": {
+        "C": [0.001, 0.01, 0.1, 1.0, 10.0, 100.0],
+        "penalty": ["l1", "l2"],
+        "solver": ["liblinear", "saga"]
+      }
+    }
+  ]
+}

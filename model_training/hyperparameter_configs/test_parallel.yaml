@@ -1,0 +1,9 @@
+models:
+  - name: LogisticRegression_Test
+    class: LogisticRegression
+    init_params:
+      max_iter: 500
+      random_state: 42
+    param_grid:
+      C: [0.1, 1.0]  # Just 2 values
+      solver: ["liblinear"]  # Just 1 value
