@@ -2,6 +2,59 @@
 
 This repository provides a production-ready, enterprise-grade platform for machine learning experimentation, tracking, and deployment using MLflow. It offers a comprehensive solution that covers the full ML lifecycle from development to production deployment, with robust tooling for hyperparameter optimization, model tracking, and cloud integration.
 
+## Architecture Overview
+
+Our MLflow Enterprise Platform implements a cloud-native architecture with Kubernetes deployment for high availability, scalability, and enterprise integration.
+
+```mermaid
+graph TD
+    subgraph "MLflow Deployment"
+        subgraph "Azure Kubernetes Service"
+            subgraph "MLflow Namespace"
+                A[MLflow Server] --> B[(PostgreSQL DB<br>Metadata Store)]
+                B <--> PVC1[PVC: data-mlflow-postgresql-0]
+                D[LoadBalancer Service] --> A
+            end
+        end
+        
+        C[Azure Blob Storage<br>artifactroot container] -.->|External Storage<br>for Artifacts| A
+        
+        E[Data Scientists] -->|Track experiments<br>Access UI| D
+        F[ML Engineers] -->|Register models<br>Deploy models| D
+        
+        subgraph "Development Environments"
+            G[Local Notebooks] -.->|Connect via<br>tracking URI| D
+            H[Cloud Notebooks] -.->|Connect via<br>tracking URI| D
+        end
+    end
+
+    classDef azure fill:#0072C6,stroke:#0072C6,color:white;
+    classDef k8s fill:#326CE5,stroke:#326CE5,color:white;
+    classDef db fill:#FFA500,stroke:#FFA500,color:white;
+    classDef pvc fill:#32a852,stroke:#32a852,color:white;
+    classDef user fill:#6CB33F,stroke:#6CB33F,color:white;
+    classDef env fill:#9370DB,stroke:#9370DB,color:white;
+
+    class C azure;
+    class A,B,D k8s;
+    class PVC1 pvc;
+    class B db;
+    class E,F user;
+    class G,H env;
+```
+
+### Key Architecture Components
+
+1. **MLflow Server**: Centralized tracking server deployed on Kubernetes, providing experiment tracking, model registry, and model serving capabilities.
+
+2. **PostgreSQL Database**: Persistent metadata store for all MLflow experiments, runs, and model registry data.
+
+3. **Azure Blob Storage**: Scalable cloud storage for artifacts including models, datasets, and visualizations.
+
+4. **Kubernetes Deployment**: Containerized infrastructure ensuring scalability, reliability and enterprise-grade security.
+
+5. **Client Access Layer**: Unified access points for data scientists and ML engineers across various development environments.
+
 ## Enterprise-Grade Features
 
 - **Scalable Architecture**: Deployment on Kubernetes with persistent storage
@@ -11,6 +64,17 @@ This repository provides a production-ready, enterprise-grade platform for machi
 - **Comprehensive Observability**: Advanced tracking and monitoring of all experiments
 - **Reproducible Research**: Environment versioning and experiment records
 - **Collaborative Development**: Team-oriented ML experiment management
+
+## ML Lifecycle Management
+
+The platform supports the complete machine learning lifecycle:
+
+1. **Data Processing**: Modular preprocessing pipelines with scikit-learn integration
+2. **Experimentation**: Structured tracking of parameters, metrics, and artifacts
+3. **Hyperparameter Tuning**: Scalable grid and random search with parallel execution
+4. **Model Registry**: Version control and stage transitions for models
+5. **Deployment**: Seamless transition from experimentation to production
+6. **Monitoring**: Runtime tracking of model performance and drift
 
 ## Repository Structure
 
@@ -74,47 +138,76 @@ This repository provides a production-ready, enterprise-grade platform for machi
 
 ### Enterprise Deployment on Azure Kubernetes Service
 
-For a production-grade MLflow server deployment, follow the instructions in the `kubernetes/README.md` file. This will guide you through:
+For a production-grade MLflow server deployment:
 
-1. Setting up Azure resources with `azure-resource-provisioning.sh`
-2. Deploying MLflow on AKS with Helm
-3. Configuring persistent storage with Azure Blob Storage
-4. Setting up PostgreSQL database for metadata
-5. Implementing authentication and access control
+1. **Provision Azure Resources**:
+   ```bash
+   bash kubernetes/azure-resource-provisioning.sh
+   ```
 
-## Documentation
+2. **Deploy MLflow on AKS**:
+   ```bash
+   helm install mlflow community-charts/mlflow \
+     --namespace mlflow \
+     --create-namespace \
+     -f kubernetes/mlflow-values.yaml
+   ```
 
-For detailed documentation on specific components:
+3. **Configure Environment for Client Access**:
+   ```bash
+   export MLFLOW_TRACKING_USERNAME="admin"
+   export MLFLOW_TRACKING_PASSWORD="<YOUR_PASSWORD>"
+   export MLFLOW_TRACKING_URI="http://<EXTERNAL-IP>"
+   ```
 
-- [Hyperparameter Tuning Framework](./model_training/README_HYPERPARAMETER_TUNING.md)
-- [Model Training System](./model_training/README.md)
-- [Enterprise Deployment on Kubernetes](./kubernetes/README.md)
+## Using the Platform
 
-## Key Platform Capabilities
+### MLflow Integration in Code
 
-This enterprise platform provides:
+```python
+import mlflow
 
-1. **Advanced Experiment Tracking**: Organized logging of parameters, metrics, and artifacts with hierarchical organization
-2. **Modular Preprocessing Pipelines**: Scikit-learn pipelines integrated with MLflow for reproducible data transformations
-3. **Comprehensive Hyperparameter Optimization**: Scalable grid and random search with parallel execution
-4. **Enterprise Cloud Integration**: Production deployment on Azure with Kubernetes and managed services
-5. **MLOps Best Practices**: CI/CD integration, model registry, and automated workflows
-6. **Collaborative Model Development**: Team-oriented experimentation and knowledge sharing
+# Connect to tracking server
+mlflow.set_tracking_uri("http://<EXTERNAL-IP>")
 
-## Example Production Workflows
+# Start an experiment run
+with mlflow.start_run():
+    # Log parameters
+    mlflow.log_param("param1", value1)
+    
+    # Log metrics
+    mlflow.log_metric("accuracy", accuracy)
+    
+    # Log models with full preprocessing pipeline
+    mlflow.sklearn.log_model(
+        pipeline,
+        "model",
+        signature=mlflow.models.infer_signature(X_train, y_train),
+        input_example=X_train.iloc[:5]
+    )
+```
 
-### Classification Model Development Workflow
+### Hyperparameter Tuning
 
-The repository includes a complete enterprise workflow for model development:
+Our platform includes a robust hyperparameter tuning framework that integrates deeply with MLflow:
 
 ```bash
-# Train a simple logistic regression model with tracking
-python model_training/train.py
+# Run grid search with real-time logging
+python model_training/tune.py --config model_training/hyperparameter_configs/logistic_regression.json
 
-# Perform distributed hyperparameter tuning
-python model_training/tune.py --config model_training/hyperparameter_configs/multi_model.yaml --no_real_time_logging
+# Run parallel random search
+python model_training/tune.py \
+    --config model_training/hyperparameter_configs/xgboost.yaml \
+    --search_type random \
+    --n_iter 20 \
+    --no_real_time_logging
+```
 
-# Submit job to Azure ML compute cluster
+### Cloud Execution
+
+For large-scale experiments, submit jobs to Azure ML:
+
+```bash
 python model_training/submit_tune_job.py \
   --subscription_id "<your-subscription-id>" \
   --resource_group "<your-resource-group>" \
@@ -123,16 +216,13 @@ python model_training/submit_tune_job.py \
   --config model_training/hyperparameter_configs/random_forest.yaml
 ```
 
-### Interactive Development Environment
+## Documentation
 
-For team exploration and development:
+For detailed documentation on specific components:
 
-1. Start Jupyter:
-   ```bash
-   jupyter notebook
-   ```
-
-2. Open notebooks in the `notebook/` directory
+- [Model Training System](./model_training/README.md) - Core training pipeline and MLflow integration
+- [Hyperparameter Tuning Framework](./model_training/README_HYPERPARAMETER_TUNING.md) - Advanced tuning capabilities
+- [Enterprise Deployment on Kubernetes](./kubernetes/README.md) - Production infrastructure setup
 
 ## Enterprise Integration Points
 
