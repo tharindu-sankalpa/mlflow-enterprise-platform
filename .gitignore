@@ -12,3 +12,4 @@ outputs/*
 *__pycache__*
 notebook/mlruns/*
 notebook/temp_data_ingestion_artifacts/*
+model_training/.env
