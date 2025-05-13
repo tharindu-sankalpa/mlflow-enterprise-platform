@@ -87,7 +87,7 @@ Features:
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd mlflow_iris_example
+cd mlflow-enterprise-platform
 ```
 
 2. Install dependencies:
