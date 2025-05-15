@@ -131,3 +131,16 @@ mlflow server \
     --host 0.0.0.0 \
     --port 5000 \
     --workers 2
+
+mlflow models serve -m runs:/977841598692450c98260e4d76b23cdd/model -p 1234 --enable-mlserver
+mlflow models serve -m runs:/977841598692450c98260e4d76b23cdd/model -p 1234 --enable-mlserver
+
+
+mlflow models serve \
+  -m runs:/35afb161a5524d5598efe2267b6f3035/model \
+  -p 1234 \
+  --enable-mlserver
+
+mlflow models serve -m runs:/35afb161a5524d5598efe2267b6f3035/model -p 1234 --enable-mlserver
+
+mlflow models build-docker -m "runs:/977841598692450c98260e4d76b23cdd/model" -n classifier-service
