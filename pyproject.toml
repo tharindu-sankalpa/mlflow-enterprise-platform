@@ -22,6 +22,8 @@ shap = "^0.47.1"
 ucimlrepo = "^0.0.7"
 scikit-optimize = "^0.10.2"
 tensorflow = "2.18.0"
+mlserver = "^1.7.0"
+mlserver-mlflow = "^1.7.0"
 
 
 [tool.poetry.group.dev.dependencies]
