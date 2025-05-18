@@ -184,26 +184,58 @@ python model_training/submit_job.py \
 
 The trained models include all preprocessing steps as part of a scikit-learn pipeline, making inference straightforward. You can use the saved pipeline directly with raw data.
 
-### Using a trained model for inference:
+### Using a trained model for inference
+
+The project includes an enhanced `inference_example.py` script that supports multiple ways to load and use models:
 
 ```bash
 # Load model from local file
-python model_training/inference_example.py --model_path ./outputs/LogisticRegression_C_1_0_pipeline.joblib
+python model_training/inference_example.py --model_path ./outputs/LogisticRegression_best_model.joblib
 
-# Or load from MLflow model registry
-python model_training/inference_example.py --mlflow_model LogisticRegression_C_1_0 --model_stage Production
+# Load from MLflow model registry by name and stage
+python model_training/inference_example.py --mlflow_model LogisticRegression_tuned --model_stage Production
+
+# Load directly from an MLflow run using run_id
+python model_training/inference_example.py --run_id abc123def456
+
+# Specify MLflow tracking URI
+python model_training/inference_example.py --mlflow_model RandomForest_tuned --mlflow_tracking_uri http://localhost:5000
 ```
+
+### Loading models from different MLflow sources
+
+MlFlow provides several ways to reference models:
+
+1. **From Model Registry**: Use a registered model name with optional version or stage
+   ```bash
+   python model_training/inference_example.py --mlflow_model "XGBClassifier_tuned" --model_stage "Production"
+   ```
+
+2. **Directly from Run**: Use a specific run_id to load a model from a training run
+   ```bash
+   python model_training/inference_example.py --run_id "977841598692450c98260e4d76b23cdd"
+   ```
+
+3. **From Local File**: Load a previously exported model file
+   ```bash
+   python model_training/inference_example.py --model_path "./outputs/model_pipeline.joblib"
+   ```
+
+For more detailed examples, see the companion document [MLflow Inference Examples](./mlflow_inference_examples.md).
+
+### Creating a REST API service
 
 You can also use the model in your FastAPI service:
 
 ```python
-import joblib
+import mlflow
 import pandas as pd
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-# Load the pipeline once at startup
-model_pipeline = joblib.load("./outputs/model_pipeline.joblib")
+# Load the model from MLflow (can be local or remote registry)
+mlflow.set_tracking_uri("http://localhost:5000")  # Optional: set tracking URI
+model_pipeline = mlflow.pyfunc.load_model("models:/RandomForestClassifier_tuned/Production")
 
 app = FastAPI()
 
@@ -230,17 +262,50 @@ async def predict(data: AdultData):
     
     # Predict - preprocessing happens automatically
     prediction = model_pipeline.predict(input_df)
-    probability = model_pipeline.predict_proba(input_df)[0][1]
     
-    return {
-        "income_class": "<=50K" if prediction[0] == 0 else ">50K",
-        "probability": float(probability)
-    }
+    # Handle both classification and regression models
+    if hasattr(model_pipeline, 'predict_proba'):
+        probability = model_pipeline.predict_proba(input_df)[0][1]
+        return {
+            "income_class": "<=50K" if prediction[0] == 0 else ">50K",
+            "probability": float(probability)
+        }
+    else:
+        return {
+            "prediction": float(prediction[0])
+        }
 ```
+
+### Finding Run IDs and Model Information
+
+You can find run IDs and model information using:
+
+1. **MLflow UI**: Navigate to the experiment and click on a run to see its ID
+
+2. **MLflow API**:
+   ```python
+   import mlflow
+   
+   # Set tracking URI if using a remote server
+   mlflow.set_tracking_uri("http://localhost:5000")
+   
+   # List runs from an experiment
+   runs = mlflow.search_runs(experiment_names=["Adult_Classification_Local"])
+   print(runs[["run_id", "metrics.test_accuracy"]])
+   
+   # List registered models
+   client = mlflow.tracking.MlflowClient()
+   for rm in client.search_registered_models():
+       print(f"Model: {rm.name}")
+   ```
 
 ## MLflow Integration
 
-This project uses MLflow to track experiments. For each model training run, the following information is logged:
+This project uses MLflow to track experiments, tune hyperparameters, and manage models. 
+
+### Tracking and Artifacts
+
+For each model training run, the following information is logged:
 
 - Model parameters
 - Evaluation metrics (accuracy, precision, recall, F1, etc.)
@@ -249,6 +314,27 @@ This project uses MLflow to track experiments. For each model training run, the 
 - Classification reports
 - The complete pipeline (preprocessing + model) for easy deployment
 
+### Model Registry
+
+Models can be registered in the MLflow Model Registry, which provides:
+
+- Version control for models
+- Stage transitions (None → Staging → Production)
+- Model lineage and metadata
+- Centralized model storage
+
+### Hyperparameter Tuning
+
+The project includes a `ModelTuner` class that integrates hyperparameter tuning with MLflow:
+
+- Records all trial runs with parameters and metrics
+- Visualizes tuning results
+- Automatically registers the best model
+- Supports both grid search and random search
+- Compatible with parallel execution for faster tuning
+
+### Viewing MLflow Data
+
 To view the tracked information, start the MLflow UI:
 
 ```bash
@@ -256,6 +342,16 @@ mlflow ui
 ```
 
 Then open http://localhost:5000 in your browser.
+
+For a remote MLflow server:
+
+```bash
+# Set the tracking URI environment variable
+export MLFLOW_TRACKING_URI=http://your-mlflow-server:5000
+
+# Or specify it in your code
+mlflow.set_tracking_uri("http://your-mlflow-server:5000")
+```
 
 ## Dataset
 
