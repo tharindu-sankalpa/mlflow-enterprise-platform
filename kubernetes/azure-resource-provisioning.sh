@@ -109,6 +109,125 @@ echo $APP_ID
 echo $CLIENT_SECRET
 echo $AZURE_TENANT_ID
 
+########################################################################################################
+# --- Install KServe and dependencies ---
+echo "Installing KServe and dependencies..."
+
+# Create namespaces
+export KSERVE_NAMESPACE="kserve"
+kubectl create namespace $KSERVE_NAMESPACE
+
+# Install Knative Serving CRDs
+echo "Installing Knative Serving CRDs..."
+kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.18.0/serving-crds.yaml
+
+# Install Knative Serving core components
+echo "Installing Knative Serving core components..."
+kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.18.0/serving-core.yaml
+
+# Download and install Istio
+echo "Downloading and installing Istio..."
+ISTIO_VERSION="1.26.0"
+ISTIO_DIR="istio-${ISTIO_VERSION}"
+
+if [ ! -d "$ISTIO_DIR" ]; then
+  curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$ISTIO_VERSION sh -
+fi
+
+# Add Istio binaries to PATH temporarily
+export PATH="$PWD/$ISTIO_DIR/bin:$PATH"
+echo "Istio downloaded. Using istioctl version: $(istioctl version --remote=false)"
+
+# Create Istio system namespace
+kubectl create namespace istio-system --dry-run=client -o yaml | kubectl apply -f -
+
+# Create Istio configuration file
+cat > istio-config.yaml << EOF
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+spec:
+  profile: default
+  components:
+    egressGateways:
+    - name: istio-egressgateway
+      enabled: true
+    ingressGateways:
+    - name: istio-ingressgateway
+      enabled: true
+EOF
+
+# Install Istio with the configuration
+echo "Installing Istio with custom configuration..."
+istioctl install -f istio-config.yaml --verify -y
+
+# Install Istio monitoring and visualization addons
+echo "Installing Istio addons (Prometheus, Grafana, Jaeger, Kiali)..."
+kubectl apply -f $ISTIO_DIR/samples/addons/prometheus.yaml
+kubectl apply -f $ISTIO_DIR/samples/addons/grafana.yaml
+kubectl apply -f $ISTIO_DIR/samples/addons/jaeger.yaml
+kubectl apply -f $ISTIO_DIR/samples/addons/kiali.yaml
+
+# Wait for Istio components to be ready
+echo "Waiting for Istio components to be ready..."
+kubectl wait --for=condition=ready pod --all -n istio-system --timeout=300s
+
+# Install Knative Istio controller
+echo "Installing Knative Istio controller..."
+kubectl apply -f https://github.com/knative/net-istio/releases/download/knative-v1.18.0/net-istio.yaml
+
+# Install Certificate Manager
+echo "Installing Certificate Manager..."
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.16.2/cert-manager.yaml
+
+# Wait for Cert Manager to be ready before installing KServe
+echo "Waiting for Cert Manager to be ready..."
+kubectl wait --for=condition=ready pod -l app=cert-manager -n cert-manager --timeout=300s
+kubectl wait --for=condition=ready pod -l app=webhook -n cert-manager --timeout=300s
+
+# Install KServe main components
+echo "Installing KServe core components..."
+kubectl apply --server-side -f https://github.com/kserve/kserve/releases/download/v0.15.0/kserve.yaml
+
+# Wait for KServe controller and webhook to be ready
+echo "Waiting for KServe controller to be ready..."
+kubectl wait --for=condition=ready pod -l control-plane=kserve-controller-manager -n kserve --timeout=300s
+
+# Apply cluster resources with retry logic for webhook availability
+echo "Installing KServe cluster resources with retry logic..."
+MAX_RETRIES=5
+for i in $(seq 1 $MAX_RETRIES); do
+  echo "Attempting to install KServe cluster resources (attempt $i of $MAX_RETRIES)..."
+  kubectl apply --server-side -f https://github.com/kserve/kserve/releases/download/v0.15.0/kserve-cluster-resources.yaml && break
+  echo "Retrying in 10 seconds..."
+  sleep 10
+done
+
+# Create a secret for Azure Blob storage (for KServe to access MLflow artifacts)
+echo "Creating Azure Blob storage secret for KServe..."
+kubectl create secret generic azure-secret -n kserve \
+  --from-literal=AZURE_STORAGE_ACCESS_KEY="$AZURE_STORAGE_ACCESS_KEY" \
+  --save-config=false
+
+# 3. Add annotation separately
+kubectl annotate secret azure-secret -n kserve \
+  serving.kserve.io/azure-storage-account-name="$STORAGE_ACCOUNT_NAME"
+
+# Create a ServiceAccount for KServe to access Azure Blob
+echo "Creating ServiceAccount for KServe with Azure access..."
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kserve-sa
+  namespace: $KSERVE_NAMESPACE
+secrets:
+- name: azure-secret
+EOF
+
+echo "KServe installation complete!"
+echo "You can now deploy ML models from MLflow to KServe using:"
+echo "wasbs://$CONTAINER_NAME@$STORAGE_ACCOUNT_NAME.blob.core.windows.net/<experiment-id>/<run-id>/artifacts/model"
+
 
 export MLFLOW_TRACKING_USERNAME="admin"
 export MLFLOW_TRACKING_PASSWORD="<YOUR_MLFLOW_UI_ADMIN_PASSWORD>"
