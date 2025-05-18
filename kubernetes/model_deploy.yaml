@@ -23,8 +23,25 @@ metadata:
 spec:
   predictor:
     serviceAccountName: kserve-sa
-    model:
+    model: # This is the primary predictor type
       modelFormat:
         name: mlflow
       protocolVersion: v2
       storageUri: "https://tharindumlflow615422a9.blob.core.windows.net/artifactroot/1/5b426b4e758a426792dfb4b0b1fa1458/artifacts/model"
+      # Probes are direct children of the 'model' spec
+      readinessProbe:
+        httpGet:
+          path: /v2/health/ready # Standard KServe v2 readiness endpoint
+          port: 8080
+        initialDelaySeconds: 420 # Approx 7 minutes
+        periodSeconds: 15
+        timeoutSeconds: 10
+        failureThreshold: 10
+      livenessProbe:
+        httpGet:
+          path: /v2/health/live # Standard KServe v2 liveness endpoint
+          port: 8080
+        initialDelaySeconds: 480 # Approx 8 minutes
+        periodSeconds: 30
+        timeoutSeconds: 10
+        failureThreshold: 5
