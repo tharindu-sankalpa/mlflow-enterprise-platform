@@ -395,7 +395,8 @@ class ModelTuner:
                 estimator, 
                 "model",
                 signature=mlflow.models.infer_signature(X_train, y_train),
-                input_example=input_example
+                input_example=input_example,
+                code_paths=["model_training/data_processor.py"]
             )
             
             # Print run URL
