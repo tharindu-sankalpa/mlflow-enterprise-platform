@@ -15,33 +15,48 @@ metadata:
   namespace: default
 secrets:
 - name: azure-secret
+imagePullSecrets:
+- name: acr-secret
 ---
 apiVersion: serving.kserve.io/v1beta1
 kind: InferenceService
 metadata:
   name: adult-income-model
+  annotations:
+    serving.kserve.io/deploymentMode: Serverless
 spec:
   predictor:
     serviceAccountName: kserve-sa
-    model: # This is the primary predictor type
+    model:
       modelFormat:
         name: mlflow
-      protocolVersion: v2
       storageUri: "https://tharindumlflow615422a9.blob.core.windows.net/artifactroot/1/5b426b4e758a426792dfb4b0b1fa1458/artifacts/model"
-      # Probes are direct children of the 'model' spec
+      # Use runtime instead of container override
+      runtime: kserve-mlflow-xgboost
+      # Added environment variables to pass to the runtime container
+      env:
+        - name: MODEL_NAME
+          value: "adult-income-model"
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          cpu: "2"
+          memory: "4Gi"
       readinessProbe:
         httpGet:
-          path: /v2/health/ready # Standard KServe v2 readiness endpoint
+          path: /v2/health/ready
           port: 8080
-        initialDelaySeconds: 420 # Approx 7 minutes
-        periodSeconds: 15
-        timeoutSeconds: 10
+        initialDelaySeconds: 120
+        periodSeconds: 10
+        timeoutSeconds: 5
         failureThreshold: 10
       livenessProbe:
         httpGet:
-          path: /v2/health/live # Standard KServe v2 liveness endpoint
+          path: /v2/health/live
           port: 8080
-        initialDelaySeconds: 480 # Approx 8 minutes
+        initialDelaySeconds: 180
         periodSeconds: 30
         timeoutSeconds: 10
         failureThreshold: 5
