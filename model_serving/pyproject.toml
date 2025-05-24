@@ -1,0 +1,35 @@
+[tool.poetry]
+name = "mlflow-serving"
+version = "0.1.0"
+description = "MLflow model serving for KServe"
+authors = ["VLTSankalpa <wltsankalpa@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.13"  # Fixed: mlserver-mlflow requires <3.13
+
+# MLServer provides the KServe v2 API implementation
+mlserver = "^1.7.0"
+mlserver-mlflow = "^1.7.0"
+
+# MLflow for model loading
+mlflow = "^2.21.3"
+
+# Your model's runtime dependencies
+scikit-learn = "^1.6.1"
+pandas = "^2.2.3"
+numpy = "^2.0.2"
+xgboost = "^3.0.0"
+cloudpickle = "^3.1.1"
+
+# Azure storage for downloading artifacts
+azure-storage-blob = "^12.25.1"
+azure-identity = "^1.21.0"
+
+# Model-specific dependencies
+ucimlrepo = "^0.0.7"
+joblib = "^1.4.2"
+scipy = "^1.15.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
