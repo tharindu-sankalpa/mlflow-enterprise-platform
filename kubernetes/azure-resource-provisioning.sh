@@ -167,6 +167,12 @@ kubectl apply -f $ISTIO_DIR/samples/addons/grafana.yaml
 kubectl apply -f $ISTIO_DIR/samples/addons/jaeger.yaml
 kubectl apply -f $ISTIO_DIR/samples/addons/kiali.yaml
 
+# remove istio observability addons
+kubectl delete -f $ISTIO_DIR/samples/addons/prometheus.yaml
+kubectl delete -f $ISTIO_DIR/samples/addons/grafana.yaml
+kubectl delete -f $ISTIO_DIR/samples/addons/jaeger.yaml
+kubectl delete -f $ISTIO_DIR/samples/addons/kiali.yaml
+
 # Wait for Istio components to be ready
 echo "Waiting for Istio components to be ready..."
 kubectl wait --for=condition=ready pod --all -n istio-system --timeout=300s
@@ -274,8 +280,164 @@ kubectl delete -f kubernetes/model_deploy.yaml
 kubectl get inferenceservice adult-income-model
 kubectl describe inferenceservice adult-income-model
 kubectl get pods
-POD_NAME="adult-income-model-predictor-00001-deployment-66cdc88f7c-gpd4n"
+POD_NAME="adult-income-model-predictor-00001-deployment-66cdc88f7c-tlsmp"
 kubectl logs $POD_NAME --all-containers=true
+
+kubectl port-forward adult-income-model-predictor-00001-deployment-66cdc88f7c-tlsmp 8080:8080
+
+curl --location 'http://localhost:8080/v2/models/adult-income-model/infer' \
+--header 'Content-Type: application/json' \
+--data '{
+    "inputs": [
+        {
+            "name": "age",
+            "shape": [
+                1
+            ],
+            "datatype": "INT64",
+            "data": [
+                39
+            ]
+        },
+        {
+            "name": "workclass",
+            "shape": [
+                1
+            ],
+            "datatype": "BYTES",
+            "data": [
+                "State-gov"
+            ]
+        },
+        {
+            "name": "fnlwgt",
+            "shape": [
+                1
+            ],
+            "datatype": "INT64",
+            "data": [
+                77516
+            ]
+        },
+        {
+            "name": "education",
+            "shape": [
+                1
+            ],
+            "datatype": "BYTES",
+            "data": [
+                "HS-grad"
+            ]
+        },
+        {
+            "name": "education-num",
+            "shape": [
+                1
+            ],
+            "datatype": "INT64",
+            "data": [
+                9
+            ]
+        },
+        {
+            "name": "marital-status",
+            "shape": [
+                1
+            ],
+            "datatype": "BYTES",
+            "data": [
+                "Divorced"
+            ]
+        },
+        {
+            "name": "occupation",
+            "shape": [
+                1
+            ],
+            "datatype": "BYTES",
+            "data": [
+                "Handlers-cleaners"
+            ]
+        },
+        {
+            "name": "relationship",
+            "shape": [
+                1
+            ],
+            "datatype": "BYTES",
+            "data": [
+                "Not-in-family"
+            ]
+        },
+        {
+            "name": "race",
+            "shape": [
+                1
+            ],
+            "datatype": "BYTES",
+            "data": [
+                "White"
+            ]
+        },
+        {
+            "name": "sex",
+            "shape": [
+                1
+            ],
+            "datatype": "BYTES",
+            "data": [
+                "Male"
+            ]
+        },
+        {
+            "name": "capital-gain",
+            "shape": [
+                1
+            ],
+            "datatype": "INT64",
+            "data": [
+                0
+            ]
+        },
+        {
+            "name": "capital-loss",
+            "shape": [
+                1
+            ],
+            "datatype": "INT64",
+            "data": [
+                0
+            ]
+        },
+        {
+            "name": "hours-per-week",
+            "shape": [
+                1
+            ],
+            "datatype": "INT64",
+            "data": [
+                40
+            ]
+        },
+        {
+            "name": "native-country",
+            "shape": [
+                1
+            ],
+            "datatype": "BYTES",
+            "data": [
+                "United-States"
+            ]
+        }
+    ]
+}'
+
+
+# Port-forward to metrics port (8082)
+kubectl port-forward adult-income-model-predictor-00001-deployment-66cdc88f7c-tlsmp 8082:8082
+
+# In another terminal, get metrics
+curl http://localhost:8082/metrics
 
 
 
