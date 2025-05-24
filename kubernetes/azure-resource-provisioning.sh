@@ -262,6 +262,20 @@ echo "ACR Password: $ACR_PASSWORD"
 # If AKS is AMD64, build for AMD64:
 docker build --platform linux/amd64 -t $ACR_LOGIN_SERVER/mlflow-xgboost-serving:v1.0.0 -f model_serving/Dockerfile.simple .
 
+# Deploy model
+kubectl apply -f kubernetes/ClusterServingRuntime-mlflow.yaml
+kubectl apply -f kubernetes/model_deploy.yaml
+
+# Remove model deployment
+kubectl delete -f kubernetes/ClusterServingRuntime-mlflow.yaml
+kubectl delete -f kubernetes/model_deploy.yaml
+
+# Verify model deployment
+kubectl get inferenceservice adult-income-model
+kubectl describe inferenceservice adult-income-model
+kubectl get pods
+POD_NAME="adult-income-model-predictor-00001-deployment-66cdc88f7c-gpd4n"
+kubectl logs $POD_NAME --all-containers=true
 
 
 
