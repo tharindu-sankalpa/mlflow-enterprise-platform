@@ -229,6 +229,50 @@ echo "You can now deploy ML models from MLflow to KServe using:"
 echo "wasbs://$CONTAINER_NAME@$STORAGE_ACCOUNT_NAME.blob.core.windows.net/<experiment-id>/<run-id>/artifacts/model"
 
 
+
+export ACR_NAME="tharindumlflowacr$(openssl rand -hex 3)"
+export RESOURCE_GROUP="tharindu-mlflow-rg"
+export LOCATION="centralindia"
+
+# Create ACR
+az acr create \
+  --resource-group $RESOURCE_GROUP \
+  --name $ACR_NAME \
+  --sku Basic \
+  --location $LOCATION
+
+# Enable admin user (for pulling images)
+az acr update --name $ACR_NAME --admin-enabled true
+
+export ACR_NAME=tharindumlflowacr2f76fa
+
+# Get ACR login server
+export ACR_LOGIN_SERVER=$(az acr show --name $ACR_NAME --query loginServer --output tsv)
+echo "ACR Login Server: $ACR_LOGIN_SERVER"
+
+
+# Get ACR credentials
+export ACR_USERNAME=$(az acr credential show --name $ACR_NAME --query username --output tsv)
+export ACR_PASSWORD=$(az acr credential show --name $ACR_NAME --query 'passwords[0].value' --output tsv)
+
+# Verify credentials
+echo "ACR Username: $ACR_USERNAME"
+echo "ACR Password: $ACR_PASSWORD"
+
+# If AKS is AMD64, build for AMD64:
+docker build --platform linux/amd64 -t $ACR_LOGIN_SERVER/mlflow-xgboost-serving:v1.0.0 -f model_serving/Dockerfile.simple .
+
+
+
+
+
+
+
+
+
+
+
+
 export MLFLOW_TRACKING_USERNAME="admin"
 export MLFLOW_TRACKING_PASSWORD="<YOUR_MLFLOW_UI_ADMIN_PASSWORD>"
 
