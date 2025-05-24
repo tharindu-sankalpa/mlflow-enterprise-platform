@@ -17,13 +17,11 @@ spec:
       value: "8080"
     - name: MLSERVER_GRPC_PORT
       value: "9000"
-    - name: MLSERVER_MODELS_DIR
+    # Added environment variables for model name and URI configuration
+    - name: MLSERVER_MODEL_NAME
+      value: "$(MODEL_NAME)"
+    - name: MLSERVER_MODEL_URI
       value: "/mnt/models"
-    # Fix: Only specify HTTP port (8080) with proper name
-    ports:
-    - containerPort: 8080
-      protocol: TCP
-      # name: http1  # Use http1 instead of http, or remove name entirely
     resources:
       requests:
         cpu: "500m"
@@ -31,19 +29,5 @@ spec:
       limits:
         cpu: "2"
         memory: "4Gi"
-    readinessProbe:
-      httpGet:
-        path: /v2/health/ready
-        port: 8080
-      initialDelaySeconds: 30
-      periodSeconds: 10
-      timeoutSeconds: 5
-    livenessProbe:
-      httpGet:
-        path: /v2/health/live
-        port: 8080
-      initialDelaySeconds: 60
-      periodSeconds: 30
-      timeoutSeconds: 10
   imagePullSecrets:
   - name: acr-secret
