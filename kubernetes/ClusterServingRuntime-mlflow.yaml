@@ -1,0 +1,49 @@
+apiVersion: serving.kserve.io/v1alpha1
+kind: ClusterServingRuntime
+metadata:
+  name: kserve-mlflow-xgboost
+spec:
+  supportedModelFormats:
+  - name: mlflow
+    version: "2"
+    autoSelect: true
+  containers:
+  - name: kserve-container
+    image: tharindumlflowacr2f76fa.azurecr.io/mlflow-xgboost-serving:v1.0.0
+    env:
+    - name: MLSERVER_MODEL_IMPLEMENTATION
+      value: mlserver_mlflow.MLflowRuntime
+    - name: MLSERVER_HTTP_PORT
+      value: "8080"
+    - name: MLSERVER_GRPC_PORT
+      value: "9000"
+    - name: MLSERVER_MODELS_DIR
+      value: "/mnt/models"
+    # Fix: Only specify HTTP port (8080) with proper name
+    ports:
+    - containerPort: 8080
+      protocol: TCP
+      # name: http1  # Use http1 instead of http, or remove name entirely
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+    readinessProbe:
+      httpGet:
+        path: /v2/health/ready
+        port: 8080
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+    livenessProbe:
+      httpGet:
+        path: /v2/health/live
+        port: 8080
+      initialDelaySeconds: 60
+      periodSeconds: 30
+      timeoutSeconds: 10
+  imagePullSecrets:
+  - name: acr-secret
